@@ -1,2 +1,2 @@
 # bggn213
-classwork for W24
+classwork for W24 at UCSD
