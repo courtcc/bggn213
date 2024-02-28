@@ -1,0 +1,220 @@
+---
+title: "Class 13"
+author: "Courtney Cameron PID:A69028599"
+format: pdf
+editor: visual
+---
+
+
+
+
+```{r}
+library(BiocManager)
+library(DESeq2)
+```
+
+
+```{r}
+counts <- read.csv('airway_scaledcounts.csv', row.names=1)
+metadata <- read.csv('airway_metadata.csv')
+```
+
+```{r}
+head(counts)
+```
+
+```{r}
+head(metadata)
+```
+
+
+>Q1. How many genes are in this dataset? 
+
+38694 genes in the data set
+
+```{r}
+nrow(counts)
+```
+
+>Q how many samples are there
+
+8 differnt samples
+```{r}
+ncol(counts)
+```
+
+>Q2 How many ‘control’ cell lines do we have? 
+
+4 control cell lines were used
+
+```{r}
+sum(metadata$dex =='control')
+```
+
+make sure the the id's in the metadata match those in the counts
+
+```{r}
+all(metadata$id == colnames(counts))
+```
+
+control mean
+```{r}
+control.inds <- metadata$dex == 'control'
+control.counts <- counts[,control.inds]
+control.mean<- apply(control.counts,1,mean)
+head(control.mean)
+
+```
+
+>Q3. How would you make the above code in either approach more robust? Is there a function that could help here? 
+
+Writing this process into a function would be more robust as opposed to copying where there is more room for error. if there were more treatmets it would save time and leave less space for mistakes.
+
+
+>Q4. Follow the same procedure for the treated samples (i.e. calculate the mean per gene across drug treated samples and assign to a labeled vector called treated.mean)
+
+treated mean
+```{r}
+treated.inds <- metadata$dex == 'treated'
+treated.counts <- counts[,treated.inds]
+treated.mean<- apply(treated.counts,1,mean)
+head(treated.mean)
+```
+
+combining the treated and control means into one data frame
+```{r}
+meancounts <- data.frame(control.mean, treated.mean)
+head(meancounts)
+```
+
+>Q5 (a). Create a scatter plot showing the mean of the treated samples against the mean of the control samples. Your plot should look something like the following
+
+```{r}
+plot(meancounts$control.mean,meancounts$treated.mean)
+```
+
+>Q5 (b).You could also use the ggplot2 package to make this figure producing the plot below. What geom_?() function would you use for this plot?
+
+```{r}
+library(ggplot2)
+ggplot(meancounts, aes(control.mean, treated.mean))+
+  geom_point()
+```
+
+
+
+>Q6. Try plotting both axes on a log scale. What is the argument to plot() that allows you to do this?
+
+```{r}
+ggplot(meancounts, aes(control.mean, treated.mean))+
+  geom_point()+
+  scale_x_continuous(trans="log2")+
+  scale_y_continuous(trans='log2')
+```
+
+Determining fold change between control and treated
+```{r}
+meancounts$log2fc <- log2(meancounts$treated.mean/meancounts$control.mean)
+head(meancounts)
+```
+
+removing the zero values from the data set
+```{r}
+zero.sum <- rowSums(meancounts[,1:2] == 0)
+to.rm.idn <-zero.sum>0
+mycounts <- meancounts[!to.rm.idn,]
+nrow(mycounts)
+```
+
+a common threshold for calling domething differently expressed is a log2FC of +2 or -2
+>Q8. Using the up.ind vector above can you determine how many up regulated genes we have at the greater than 2 fc level? 
+how many of the genes are "up regulated"
+
+```{r}
+sum(mycounts$log2fc >= 2)
+```
+
+
+>Q9. Using the down.ind vector above can you determine how many down regulated genes we have at the greater than 2 fc level? 
+
+```{r}
+sum(mycounts$log2fc <= -2)
+```
+
+
+>Q10. Do you trust these results? Why or why not?
+
+this is only looking at the difference of the means, so we are only looking at the change between two valuse without knowing if there is variance in the values put into the means and we don't know the expression change is significant
+
+
+
+Doing the analysis with DESeq2  
+
+```{r}
+#| message:false
+library(DESeq2)
+```
+
+setup for DESeq analysis
+```{r}
+dds<-DESeqDataSetFromMatrix(countData=counts,
+                       colData=metadata,
+                       design=~dex)
+```
+```{r}
+dds<-DESeq(dds)
+```
+
+```{r}
+res<- results(dds)
+res
+```
+visualization of differential expression is a volcano plot, plotting fold change by pvalue
+```{r}
+plot(res$log2FoldChange,-log(res$padj),
+     ylab="-log(P-value)",
+     xlab='log2(Fold-change)')
+abline(v=c(-2,2), col='red')
+abline(h=-0.05, col='red')
+```
+
+Save the results
+
+```{r}
+write.csv(res, file='myresults.csv')
+```
+
+
+
+Adding annotation data
+```{r}
+library("AnnotationDbi")
+library("org.Hs.eg.db")
+columns(org.Hs.eg.db)
+```
+
+The results has ensemble gene ids but we want to convert them to gene symbol names
+
+```{r}
+res$symbol <- mapIds(org.Hs.eg.db,
+                     keys=row.names(res), 
+                     keytype="ENSEMBL",        
+                     column="SYMBOL",          
+                     multiVals="first")
+res$entrez <-mapIds(org.Hs.eg.db,
+                     keys=row.names(res), 
+                     keytype="ENSEMBL",        
+                     column="ENTREZID",          
+                     multiVals="first")
+```
+
+multivals=first is the default value, maps to only the first hit(most common)
+
+```{r}
+head(res)
+```
+overwriting the csv file to include the new id columns
+```{r}
+write.csv(res, file='myresults.csv')
+```
+
