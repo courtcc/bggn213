@@ -1,4 +1,4 @@
-# bggn213
+# Courtney's Bioinformatics Coursework
 Classwork for [bggn213 W24 at UC San Diego](https://bioboot.github.io/bggn213_W24/) 
 
 - Class 5: [Data vizualization with ggplot2]([https://github.com/courtcc/bggn213/blob/main/lab5/lab5.pdf](https://github.com/courtcc/bggn213/blob/main/lab5/lab5.md))
